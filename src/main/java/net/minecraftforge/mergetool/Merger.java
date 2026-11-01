@@ -6,12 +6,8 @@ package net.minecraftforge.mergetool;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.InnerClassNode;
-import org.objectweb.asm.tree.LineNumberNode;
-import org.objectweb.asm.tree.MethodNode;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
@@ -25,17 +21,12 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Set;
-import java.util.function.BiPredicate;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
@@ -53,14 +44,15 @@ public class Merger {
     private final File merged;
     private AnnotationVersion annotation = null;
     private boolean annotationInject = true;
-    private FieldName FIELD = new FieldName();
-    private MethodDesc METHOD = new MethodDesc();
+    private MemberMerger members = new DefaultMemberMerger(null);
+    private MemberMerger fg1Members = new FG1MemberMerger(null);
     private HashSet<String> whitelist = new HashSet<>();
     private Predicate<String> filter = name -> this.whitelist.isEmpty() || this.whitelist.contains(name);
     private boolean copyData = false;
     private boolean keepMeta = false;
     private boolean bundledServerJar = false;
     private boolean sortInterfaces = false;
+    private boolean fg1 = false;
 
     public Merger(File client, File server, File merged) {
         this.client = client;
@@ -71,6 +63,8 @@ public class Merger {
     public Merger annotate(AnnotationVersion ano, boolean inject) {
         this.annotation = ano;
         this.annotationInject = inject;
+        this.members = new DefaultMemberMerger(ano);
+        this.fg1Members = new FG1MemberMerger(ano);
         return this;
     }
 
@@ -115,6 +109,11 @@ public class Merger {
 
     public Merger sortInterfaces() {
         this.sortInterfaces = true;
+        return this;
+    }
+
+    public Merger fg1() {
+        this.fg1 = true;
         return this;
     }
 
@@ -301,8 +300,7 @@ public class Merger {
         ClassNode cClassNode = getClassNode(cIn);
         ClassNode sClassNode = getClassNode(sIn);
 
-        processFields(cClassNode, sClassNode);
-        processMethods(cClassNode, sClassNode);
+        (this.fg1 ? this.fg1Members : this.members).process(cClassNode, sClassNode);
         processInners(cClassNode, sClassNode);
         processInterfaces(cClassNode, sClassNode);
 
@@ -372,143 +370,6 @@ public class Merger {
         ClassNode classNode = new ClassNode();
         reader.accept(classNode, 0);
         return classNode;
-    }
-
-    private static <T, U> BiPredicate<? super U, ? super U> curry(Function<? super U, ? extends T> function, BiPredicate<? super T, ? super T> primary) {
-        return (a,b) -> primary.test(function.apply(a), function.apply(b));
-    }
-
-    private void processFields(ClassNode cClass, ClassNode sClass) {
-        merge(cClass.name, sClass.name, cClass.fields, sClass.fields, curry(FIELD, Objects::equals), FIELD, FIELD, FIELD);
-    }
-
-    private void processMethods(ClassNode cClass, ClassNode sClass) {
-        METHOD.prepare(cClass, sClass);
-        merge(cClass.name, sClass.name, cClass.methods, sClass.methods, curry(METHOD, Objects::equals), METHOD, METHOD, METHOD);
-    }
-
-    private interface MemberAnnotator<T> {
-        T process(T member, boolean isClient);
-    }
-
-    private class FieldName implements Function<FieldNode, String>, MemberAnnotator<FieldNode>, Comparator<FieldNode> {
-        public String apply(FieldNode in) {
-            return in == null ? "null" : in.name;
-        }
-
-        public FieldNode process(FieldNode field, boolean isClient) {
-            if (Merger.this.annotation != null)
-                Merger.this.annotation.add(field, isClient);
-            return field;
-        }
-
-        @Override
-        public int compare(FieldNode a, FieldNode b) {
-            if (a == b) return 0;
-            if (a == null) return 1;
-            if (b == null) return -1;
-            return a.name.compareTo(b.name);
-        }
-    }
-
-    private class MethodDesc implements Function<MethodNode, String>, MemberAnnotator<MethodNode>, Comparator<MethodNode> {
-        private Map<MethodNode, Integer> firstLines = new IdentityHashMap<>();
-
-        public String apply(MethodNode node) {
-            return node == null ? "null" : node.name + node.desc;
-        }
-
-        public MethodNode process(MethodNode node, boolean isClient) {
-            if (Merger.this.annotation != null)
-                Merger.this.annotation.add(node, isClient);
-            return node;
-        }
-
-        public void prepare(ClassNode cClass, ClassNode sClass) {
-            this.firstLines = new IdentityHashMap<>();
-            findLines(cClass.methods);
-            findLines(sClass.methods);
-        }
-
-        private void findLines(List<MethodNode> methods) {
-            int firstLine = Integer.MAX_VALUE;
-            for (int x = methods.size() - 1; x >= 0; x--) {
-                MethodNode method = methods.get(x);
-                for (AbstractInsnNode insn : method.instructions) {
-                    if (insn instanceof LineNumberNode) {
-                        firstLine = ((LineNumberNode)insn).line;
-                        break;
-                    }
-                }
-                this.firstLines.put(method, firstLine);
-            }
-        }
-
-        @Override
-        public int compare(MethodNode a, MethodNode b) {
-            if (a == b) return 0;
-            if (a == null) return 1;
-            if (b == null) return -1;
-            return this.firstLines.get(a) - this.firstLines.get(b);
-        }
-    }
-
-    private <T> void merge(String cName, String sName, List<T> client, List<T> server, BiPredicate<? super T, ? super T> eq,
-            MemberAnnotator<T> annotator, Function<T, String> toString, Comparator<T> compare) {
-        // adding null to the end to not handle the index overflow in a special way
-        client.add(null);
-        server.add(null);
-        Set<String> serverMembers = new HashSet<>();
-        for (T st : server)
-            serverMembers.add(toString.apply(st));
-        List<T> common = new ArrayList<>();
-        for (T ct : client) {
-            if (ct != null && serverMembers.contains(toString.apply(ct)))
-                common.add(ct);
-        }
-        common.add(null);
-
-        int i = 0, mi = 0;
-        for(; i < client.size(); i++) {
-            T ct = client.get(i);
-            T st = server.get(i);
-            T mt = common.get(mi);
-
-            if (eq.test(ct, st)) {
-                mi++;
-                if (!eq.test(ct, mt))
-                    throw new IllegalStateException("merged list is in bad state: " + toString.apply(ct) + " " + toString.apply(st) + " " + toString.apply(mt));
-                if (DEBUG)
-                    System.out.printf("%d/%d %d/%d Both Shared  : %s %s\n", i, client.size(), mi, common.size(), sName, toString.apply(st));
-
-            } else if(eq.test(st, mt)) {
-                server.add(i, annotator.process(ct, true));
-                if (DEBUG)
-                    System.out.printf("%d/%d %d/%d Server *add* : %s %s\n", i, client.size(), mi, common.size(), sName, toString.apply(ct));
-            } else if (eq.test(ct, mt)) {
-                client.add(i, annotator.process(st, false));
-                if (DEBUG)
-                    System.out.printf("%d/%d %d/%d Client *add* : %s %s\n", i, client.size(), mi, common.size(), cName, toString.apply(st));
-            } else { // Both server and client add a new method before we get to the next common method... Lets try and prioritize one.
-                int diff = compare.compare(ct,  st);
-                if  (diff > 0) {
-                    client.add(i, annotator.process(st, false));
-                    if (DEBUG)
-                        System.out.printf("%d/%d %d/%d Client *add* : %s %s\n", i, client.size(), mi, common.size(), cName, toString.apply(st));
-                } else { /* if (diff < 0) */ //Technically this should be <0 and we special case when they can't agree who goes first.. but for now just push the client's first.
-                    server.add(i, annotator.process(ct, true));
-                    if (DEBUG)
-                        System.out.printf("%d/%d %d/%d Server *add* : %s %s\n", i, client.size(), mi, common.size(), sName, toString.apply(ct));
-                }
-            }
-        }
-
-        if (i < server.size() || mi < common.size() || (client.size() != server.size()))
-            throw new IllegalStateException("merged list is in bad state: " + i + " " + mi);
-
-        // removing the null
-        client.remove(client.size() - 1);
-        server.remove(server.size() - 1);
     }
 
     private byte[] getResourceBytes(String path) throws IOException {

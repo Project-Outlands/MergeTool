@@ -77,6 +77,7 @@ public class ConsoleMerger {
         OptionSpec<Void> data = parser.accepts("keep-data");
         OptionSpec<Void> meta = parser.accepts("keep-meta");
         OptionSpec<Void> sortInterfaces = parser.accepts("sort-interfaces");
+        OptionSpec<Void> fg1 = parser.accepts("fg1");
         OptionSpec<AnnotationVersion> anno = parser.accepts("ann").withOptionalArg().ofType(AnnotationVersion.class).withValuesConvertedBy(AnnotationReader).defaultsTo(AnnotationVersion.API);
         OptionSpec<String> whitelist    = parser.accepts("whitelist").withRequiredArg().ofType(String.class);
         OptionSpec<String> whitelistPkg = parser.accepts("whitelist-pkg").withRequiredArg().ofType(String.class);
@@ -112,6 +113,9 @@ public class ConsoleMerger {
 
             if (options.has(sortInterfaces))
                 merge.sortInterfaces();
+
+            if (options.has(fg1))
+                merge.fg1();
 
             Predicate<String> filter = null;
             if (options.has(whitelist) || options.has(whitelistMap)) {
@@ -154,7 +158,7 @@ public class ConsoleMerger {
 
             merge.process();
         } catch (OptionException e) {
-            System.out.println("Usage: ConsoleMerger --merge --client <ClientJar> --server <ServerJar> --output <MergedJar> [--ann CPW|NMF|API] [--keep-data] [--keep-meta]");
+            System.out.println("Usage: ConsoleMerger --merge --client <ClientJar> --server <ServerJar> --output <MergedJar> [--ann CPW|NMF|API] [--fg1] [--keep-data] [--keep-meta]");
             e.printStackTrace();
             sneak(e);
         } catch (IOException e) {
