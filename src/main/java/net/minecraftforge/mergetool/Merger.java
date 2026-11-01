@@ -26,8 +26,9 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -206,7 +207,7 @@ public class Merger {
     }
 
     private Map<String, byte[]> getClassEntries(ZipInputStream input, ZipOutputStream output, Set<String> added) throws IOException {
-        Map<String, byte[]> ret = new Hashtable<>();
+        Map<String, byte[]> ret = new HashMap<>();
         for (ZipEntry entry; (entry = input.getNextEntry()) != null; ) {
             String entryName = entry.getName();
             if (!entry.isDirectory() && entryName.endsWith(".class") && !entryName.startsWith(".")) {
@@ -382,6 +383,7 @@ public class Merger {
     }
 
     private void processMethods(ClassNode cClass, ClassNode sClass) {
+        METHOD.prepare(cClass, sClass);
         merge(cClass.name, sClass.name, cClass.methods, sClass.methods, curry(METHOD, Objects::equals), METHOD, METHOD, METHOD);
     }
 
@@ -410,6 +412,8 @@ public class Merger {
     }
 
     private class MethodDesc implements Function<MethodNode, String>, MemberAnnotator<MethodNode>, Comparator<MethodNode> {
+        private Map<MethodNode, Integer> firstLines = new IdentityHashMap<>();
+
         public String apply(MethodNode node) {
             return node == null ? "null" : node.name + node.desc;
         }
@@ -420,13 +424,24 @@ public class Merger {
             return node;
         }
 
-        private int findLine(MethodNode member) {
-            for (int x = 0; x < member.instructions.size(); x++) {
-                AbstractInsnNode insn = member.instructions.get(x);
-                if (insn instanceof LineNumberNode)
-                    return ((LineNumberNode)insn).line;
+        public void prepare(ClassNode cClass, ClassNode sClass) {
+            this.firstLines = new IdentityHashMap<>();
+            findLines(cClass.methods);
+            findLines(sClass.methods);
+        }
+
+        private void findLines(List<MethodNode> methods) {
+            int firstLine = Integer.MAX_VALUE;
+            for (int x = methods.size() - 1; x >= 0; x--) {
+                MethodNode method = methods.get(x);
+                for (AbstractInsnNode insn : method.instructions) {
+                    if (insn instanceof LineNumberNode) {
+                        firstLine = ((LineNumberNode)insn).line;
+                        break;
+                    }
+                }
+                this.firstLines.put(method, firstLine);
             }
-            return Integer.MAX_VALUE;
         }
 
         @Override
@@ -434,7 +449,7 @@ public class Merger {
             if (a == b) return 0;
             if (a == null) return 1;
             if (b == null) return -1;
-            return findLine(a) - findLine(b);
+            return this.firstLines.get(a) - this.firstLines.get(b);
         }
     }
 
@@ -443,15 +458,15 @@ public class Merger {
         // adding null to the end to not handle the index overflow in a special way
         client.add(null);
         server.add(null);
+        Set<String> serverMembers = new HashSet<>();
+        for (T st : server)
+            serverMembers.add(toString.apply(st));
         List<T> common = new ArrayList<>();
-        for(T ct : client) {
-            for (T st : server) {
-                if (eq.test(ct, st)) {
-                    common.add(ct);
-                    break;
-                }
-            }
+        for (T ct : client) {
+            if (ct != null && serverMembers.contains(toString.apply(ct)))
+                common.add(ct);
         }
+        common.add(null);
 
         int i = 0, mi = 0;
         for(; i < client.size(); i++) {
