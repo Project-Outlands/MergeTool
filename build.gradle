@@ -1,23 +1,23 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-import net.minecraftforge.gradleutils.PomUtils
 
 plugins {
     id 'java'
     id 'eclipse'
     id 'maven-publish'
-    id 'net.minecraftforge.licenser' version '1.0.1'
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
-    id 'com.github.ben-manes.versions' version '0.51.0'
-    id 'net.minecraftforge.gradleutils' version '[2.3,2.4]'
+    id 'net.minecraftforge.licenser' version '1.2.0'
+    id 'com.gradleup.shadow' version '9.6.1'
+    id 'io.github.ben-manes.versions' version '0.67.0'
+    id 'net.minecraftforge.gradleutils' version '3.4.11'
+    id 'net.minecraftforge.gitversion' version '4.0.1'
 }
 
 group = 'net.minecraftforge'
-version = gradleutils.tagOffsetVersion
+version = gitversion.version
 println "Version: $version"
 
 repositories {
     mavenCentral()
-    maven gradleutils.forgeMaven
+    maven gradleutils.forgeReleaseMaven
 }
 
 license {
@@ -86,12 +86,12 @@ publishing {
             description = 'Merges two jar files together, useful for rebuilding Retroguard stripped jars.'
             url = 'https://github.com/MinecraftForge/MergeTool'
 
-            PomUtils.setGitHubDetails(pom, 'MergeTool')
+            gradleutils.pom.addRemoteDetails(pom)
 
-            license PomUtils.Licenses.LGPLv2_1
+            license gradleutils.pom.licenses.LGPLv2_1
 
             developers {
-                developer PomUtils.Developers.LexManos
+                developer gradleutils.pom.developers.LexManos
             }
         }
     }
