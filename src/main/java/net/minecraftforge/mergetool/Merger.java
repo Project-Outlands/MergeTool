@@ -359,7 +359,7 @@ public class Merger {
             Collections.sort(sIntfs);
         }
 
-        if (this.annotation != null && !cOnly.isEmpty() || !sOnly.isEmpty()) {
+        if (this.annotation != null && (!cOnly.isEmpty() || !sOnly.isEmpty())) {
             this.annotation.add(cClass, cOnly, sOnly);
             this.annotation.add(sClass, cOnly, sOnly);
         }

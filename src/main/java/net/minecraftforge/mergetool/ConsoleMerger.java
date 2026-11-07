@@ -143,12 +143,12 @@ public class ConsoleMerger {
             if (options.has(blacklist) || options.has(blacklistMap)) {
                 Set<String> classes = loadList(options.valuesOf(blacklist), options.valuesOf(blacklistMap));
                 if (!classes.isEmpty())
-                    filter.and(name -> !classes.contains(name));
+                    filter = filter.and(name -> !classes.contains(name));
             }
 
             if (options.has(blacklistPkg)) {
                 Set<String> pkgs = loadPackages(options.valuesOf(blacklistPkg));
-                filter.and(name -> {
+                filter = filter.and(name -> {
                     int idx = name.lastIndexOf('/');
                     return idx == -1 ? !pkgs.contains("/") : !pkgs.contains(name.substring(0, idx));
                 });
@@ -219,8 +219,8 @@ public class ConsoleMerger {
     private static Set<String> loadPackages(List<String> strings) {
         Set<String> pkgs = new HashSet<>();
         for (String value : strings) {
-            if (!value.endsWith("/"))
-                value += '/';
+            if (value.endsWith("/"))
+                value = value.substring(0, value.length() - 1);
             pkgs.add(value);
         }
         return pkgs;
