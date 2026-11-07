@@ -13,6 +13,14 @@ plugins {
 }
 
 dependencyResolutionManagement {
+    repositories {
+        maven {
+            name = 'Outlands'
+            url = 'https://maven.outlands.top/releases'
+        }
+        mavenCentral()
+    }
+
     versionCatalogs {
         libs {
             library('jopt-simple', 'net.sf.jopt-simple:jopt-simple:6.0-alpha-3')
@@ -35,3 +43,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = 'MergeTool'
+
+include 'markers'

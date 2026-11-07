@@ -120,6 +120,10 @@ public class Merger {
     public void process() throws IOException {
         try (ZipOutputStream outJar = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(this.merged)))) {
             Set<String> added = new HashSet<>();
+            if (this.annotation != null) {
+                for (String cls : this.annotation.getClasses())
+                    added.add(cls + ".class");
+            }
             Map<String, byte[]> cClasses = getClassEntries(this.client, outJar, added);
             Map<String, byte[]> sClasses;
             if (this.bundledServerJar)
@@ -130,7 +134,7 @@ public class Merger {
             for (Entry<String, byte[]> entry : cClasses.entrySet()) {
                 String name = entry.getKey();
 
-                if (!this.filter.test(name))
+                if (!this.filter.test(name) || added.contains(name + ".class"))
                     continue;
 
                 byte[] cData = entry.getValue();

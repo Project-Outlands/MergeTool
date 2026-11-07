@@ -14,9 +14,11 @@ import org.objectweb.asm.Type;
 import net.minecraftforge.srgutils.MinecraftVersion;
 
 public enum AnnotationVersion {
-    CPW("cpw/mods/fml/relauncher",           "SideOnly", "Side", null,      null,         "CLIENT", "SERVER"),
-    NMF("net/minecraftforge/fml/relauncher", "SideOnly", "Side", null,      null,         "CLIENT", "SERVER"),
-    API("net/minecraftforge/api/distmarker", "OnlyIn",   "Dist", "OnlyIns", "_interface", "CLIENT", "DEDICATED_SERVER");
+    CPW("cpw/mods/fml/relauncher",           "SideOnly", "Side", null,      null,         "CLIENT", "SERVER", true),
+    NMF("net/minecraftforge/fml/relauncher", "SideOnly", "Side", null,      null,         "CLIENT", "SERVER", true),
+    API("net/minecraftforge/api/distmarker", "OnlyIn",   "Dist", "OnlyIns", "_interface", "CLIENT", "DEDICATED_SERVER", true),
+    NEO("net/neoforged/api/distmarker",      "OnlyIn",   "Dist", "OnlyIns", "_interface", "CLIENT", "DEDICATED_SERVER", true),
+    FABRIC("net/fabricmc/api",               "Environment", "EnvType", null, null,         "CLIENT", "SERVER", false);
 
     private final String holder;
     private final String value;
@@ -24,17 +26,19 @@ public enum AnnotationVersion {
     private final String interface_key;
     private final String client;
     private final String server;
+    private final boolean runtimeRetention;
 
     private static final MinecraftVersion MC_8 = MinecraftVersion.from("14w02a");
     private static final MinecraftVersion MC_13 = MinecraftVersion.from("17w43a");
 
-    private AnnotationVersion(String pkg, String holder, String value, String repeatable, String interface_key, String client, String server) {
+    private AnnotationVersion(String pkg, String holder, String value, String repeatable, String interface_key, String client, String server, boolean runtimeRetention) {
         this.holder = 'L' + pkg + '/' + holder + ';';
         this.value  = 'L' + pkg + '/' + value  + ';';
         this.repeatable = repeatable == null ? null : 'L' + pkg + '/' + repeatable + ';';
         this.interface_key = interface_key;
         this.client = client;
         this.server = server;
+        this.runtimeRetention = runtimeRetention;
     }
 
     public static AnnotationVersion fromVersion(String v) {
@@ -66,26 +70,26 @@ public enum AnnotationVersion {
 
         if (clientOnly.size() + serverOnly.size() == 1) {
             if (clientOnly.size() == 1)
-                add(cls.visitAnnotation(this.holder, true), true).visit(interface_key, Type.getObjectType(clientOnly.get(0)));
+                add(cls.visitAnnotation(this.holder, this.runtimeRetention), true).visit(interface_key, Type.getObjectType(clientOnly.get(0)));
             else
-                add(cls.visitAnnotation(this.holder, true), false).visit(interface_key, Type.getObjectType(serverOnly.get(0)));
+                add(cls.visitAnnotation(this.holder, this.runtimeRetention), false).visit(interface_key, Type.getObjectType(serverOnly.get(0)));
         } else {
-            AnnotationVisitor rep = cls.visitAnnotation(this.holder, true).visitArray("value");
+            AnnotationVisitor rep = cls.visitAnnotation(this.holder, this.runtimeRetention).visitArray("value");
             clientOnly.forEach(intf -> add(rep.visitAnnotation(null, this.repeatable), true).visit(interface_key, Type.getObjectType(intf)));
             serverOnly.forEach(intf -> add(rep.visitAnnotation(null, this.repeatable), false).visit(interface_key, Type.getObjectType(intf)));
         }
     }
 
     public void add(ClassVisitor cls, boolean isClientOnly) {
-        add(cls.visitAnnotation(this.holder, true), isClientOnly);
+        add(cls.visitAnnotation(this.holder, this.runtimeRetention), isClientOnly);
     }
 
     public void add(FieldVisitor fld, boolean isClientOnly) {
-        add(fld.visitAnnotation(this.holder, true), isClientOnly);
+        add(fld.visitAnnotation(this.holder, this.runtimeRetention), isClientOnly);
     }
 
     public void add(MethodVisitor mtd, boolean isClientOnly) {
-        add(mtd.visitAnnotation(this.holder, true), isClientOnly);
+        add(mtd.visitAnnotation(this.holder, this.runtimeRetention), isClientOnly);
     }
 
     private AnnotationVisitor add(AnnotationVisitor ann, boolean isClientOnly) {

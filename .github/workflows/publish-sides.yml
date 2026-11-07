@@ -1,0 +1,107 @@
+name: Publish Side Jars
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish the side jars under'
+        required: true
+        type: string
+      cpw:
+        description: 'Publish the CPW side jar'
+        required: true
+        type: boolean
+        default: false
+      fml:
+        description: 'Publish the FML side jar'
+        required: true
+        type: boolean
+        default: false
+      api:
+        description: 'Publish the API side jar'
+        required: true
+        type: boolean
+        default: false
+      neo:
+        description: 'Publish the Neo side jar'
+        required: true
+        type: boolean
+        default: false
+      fabric:
+        description: 'Publish the Fabric side jar'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Select publications
+        id: publications
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          CPW: ${{ inputs.cpw }}
+          FML: ${{ inputs.fml }}
+          API: ${{ inputs.api }}
+          NEO: ${{ inputs.neo }}
+          FABRIC: ${{ inputs.fabric }}
+        run: |
+          if [[ -z "$VERSION" ]]; then
+            echo 'A version is required.'
+            exit 1
+          fi
+          tasks=()
+          paths=()
+          for side in cpw fml api neo fabric; do
+            case "$side" in
+              cpw) selected="$CPW" ;;
+              fml) selected="$FML" ;;
+              api) selected="$API" ;;
+              neo) selected="$NEO" ;;
+              fabric) selected="$FABRIC" ;;
+            esac
+            if [[ "$selected" == 'true' ]]; then
+              task=":markers:publish${side^}PublicationToOutlandsRepository"
+              tasks+=("$task")
+              paths+=("markers/build/publications/$side")
+              echo "Selected $task"
+            fi
+          done
+          if [[ ${#tasks[@]} -eq 0 ]]; then
+            echo 'Select at least one side jar to publish.'
+            exit 1
+          fi
+          {
+            echo "tasks=${tasks[*]}"
+            echo "paths=$(IFS=,; echo "${paths[*]}")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish selected jars to Maven
+        run: ./gradlew :markers:build ${{ steps.publications.outputs.tasks }} -PmarkerVersion=${{ inputs.version }} --no-daemon --no-configuration-cache
+        env:
+          OUTLANDS_USERNAME: ${{ secrets.OUTLANDS_MAVEN_USER }}
+          OUTLANDS_PASSWORD: ${{ secrets.OUTLANDS_MAVEN_PASSWORD }}
+
+      - name: Upload publication metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: mergetool-sides
+          path: ${{ steps.publications.outputs.paths }}
+          if-no-files-found: error

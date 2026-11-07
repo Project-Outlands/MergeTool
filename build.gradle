@@ -16,6 +16,10 @@ version = gitversion.version
 println "Version: $version"
 
 repositories {
+    maven {
+        name = 'Outlands'
+        url = providers.gradleProperty('outlandsRepoUrl').orNull ?: 'https://maven.outlands.top/releases'
+    }
     mavenCentral()
     maven gradleutils.forgeReleaseMaven
 }
@@ -70,9 +74,11 @@ dependencies {
     implementation(libs.jopt.simple)
     implementation(libs.srgutils)
 
-    markers 'net.minecraftforge:mergetool-cpw:1.0'
-    markers 'net.minecraftforge:mergetool-fml:1.0'
-    markers 'net.minecraftforge:mergetool-api:1.0'
+    markers "top.outlands:mergetool-cpw:1.0"
+    markers "top.outlands:mergetool-fml:1.0"
+    markers "top.outlands:mergetool-api:1.0"
+    markers "top.outlands:mergetool-neo:1.0"
+    markers "top.outlands:mergetool-fabric:1.0"
 }
 
 publishing {
@@ -97,6 +103,13 @@ publishing {
     }
 
     repositories {
-        maven gradleutils.publishingForgeMaven
+        maven {
+            name = 'Outlands'
+            url = 'https://maven.outlands.top/releases'
+            credentials {
+                username = providers.gradleProperty('outlandsUsername').orNull ?: System.getenv('OUTLANDS_USERNAME')
+                password = providers.gradleProperty('outlandsPassword').orNull ?: System.getenv('OUTLANDS_PASSWORD')
+            }
+        }
     }
 }

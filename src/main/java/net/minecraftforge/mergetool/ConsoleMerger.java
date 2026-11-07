@@ -158,7 +158,7 @@ public class ConsoleMerger {
 
             merge.process();
         } catch (OptionException e) {
-            System.out.println("Usage: ConsoleMerger --merge --client <ClientJar> --server <ServerJar> --output <MergedJar> [--ann CPW|NMF|API] [--fg1] [--keep-data] [--keep-meta]");
+            System.out.println("Usage: ConsoleMerger --merge --client <ClientJar> --server <ServerJar> --output <MergedJar> [--ann CPW|NMF|API|NEO|FABRIC] [--fg1] [--keep-data] [--keep-meta]");
             e.printStackTrace();
             sneak(e);
         } catch (IOException e) {

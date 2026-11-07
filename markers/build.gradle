@@ -1,0 +1,66 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+}
+
+group = 'top.outlands'
+version = providers.gradleProperty('markerVersion').get()
+
+def markerSets = ['cpw', 'fml', 'api', 'neo', 'fabric']
+
+sourceSets {
+    markerSets.each { name -> create(name) }
+}
+
+tasks.register('cpwJar', Jar) {
+    archiveBaseName = 'mergetool-cpw'
+    from sourceSets.cpw.output
+}
+tasks.register('fmlJar', Jar) {
+    archiveBaseName = 'mergetool-fml'
+    from sourceSets.fml.output
+}
+tasks.register('apiJar', Jar) {
+    archiveBaseName = 'mergetool-api'
+    from sourceSets.api.output
+}
+tasks.register('neoJar', Jar) {
+    archiveBaseName = 'mergetool-neo'
+    from sourceSets.neo.output
+}
+tasks.register('fabricJar', Jar) {
+    archiveBaseName = 'mergetool-fabric'
+    from sourceSets.fabric.output
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(8)
+    }
+}
+
+publishing {
+    publications {
+        markerSets.each { name ->
+            register(name, MavenPublication) {
+                artifactId = "mergetool-${name}"
+                artifact tasks.named(sourceSets[name].jarTaskName)
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = 'Outlands'
+            url = providers.gradleProperty('outlandsRepoUrl').orNull ?: 'https://maven.outlands.top/releases'
+            def user = providers.gradleProperty('outlandsUsername').orNull ?: System.getenv('OUTLANDS_USERNAME')
+            def pass = providers.gradleProperty('outlandsPassword').orNull ?: System.getenv('OUTLANDS_PASSWORD')
+            if (user != null && pass != null) {
+                credentials {
+                    username = user
+                    password = pass
+                }
+            }
+        }
+    }
+}
