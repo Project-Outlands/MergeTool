@@ -11,7 +11,7 @@ plugins {
     id 'net.minecraftforge.gitversion' version '4.0.1'
 }
 
-group = 'net.minecraftforge'
+group = 'top.outlands'
 version = gitversion.version
 println "Version: $version"
 

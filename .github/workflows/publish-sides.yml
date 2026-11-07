@@ -90,7 +90,9 @@ jobs:
           fi
           {
             echo "tasks=${tasks[*]}"
-            echo "paths=$(IFS=,; echo "${paths[*]}")"
+            echo "paths<<EOF"
+            printf '%s\n' "${paths[@]}"
+            echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
       - name: Publish selected jars to Maven

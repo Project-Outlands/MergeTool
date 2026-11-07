@@ -4,7 +4,19 @@ plugins {
 }
 
 group = 'top.outlands'
-version = providers.gradleProperty('markerVersion').get()
+
+def markerVersion = providers.gradleProperty('markerVersion')
+if (markerVersion.isPresent()) {
+    version = markerVersion.get()
+}
+
+tasks.withType(PublishToMavenRepository).configureEach {
+    doFirst {
+        if (!markerVersion.isPresent()) {
+            throw new GradleException('Set -PmarkerVersion=<version> to publish the side jars.')
+        }
+    }
+}
 
 def markerSets = ['cpw', 'fml', 'api', 'neo', 'fabric']
 
